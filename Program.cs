@@ -26,7 +26,9 @@ builder.Services.AddIdentity<AppUser, IdentityRole>(
         options.Password.RequireNonAlphanumeric = false;
 
     }).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
+builder.Services.AddTransient<RoleSeeder>();
 builder.Services.AddTransient<AdminSeeder>();
+
 
 
 
@@ -39,13 +41,17 @@ using (var scope = app.Services.CreateScope())
     var logger = services.GetRequiredService<ILogger<Program>>();
     try
     {
+        var roleSeeder = services.GetRequiredService<RoleSeeder>();
+        await roleSeeder.SeedRoleAsync();
+
         var adminSeeder = services.GetRequiredService<AdminSeeder>();
         await adminSeeder.SeedAdminAsync();
-        logger.LogInformation("Admin seeded successfully.");
+
+        logger.LogInformation("Seeding completed successfully.");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "An error occured while seeding the user");
+        logger.LogError(ex, "An error occured during database seeding");
     }
 }
 
