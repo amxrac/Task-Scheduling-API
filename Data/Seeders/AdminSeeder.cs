@@ -42,6 +42,7 @@ namespace Task_Scheduling_API.Data.Seeders
                     Name = "System Admin",
                     UserName = adminEmail,
                     Email = adminEmail,
+                    EmailConfirmed = true
                 };
 
                 var result = await _userManager.CreateAsync(adminUser, adminPassword);
