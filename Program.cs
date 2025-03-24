@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Task_Scheduling_API.Data;
 using Task_Scheduling_API.Data.Seeders;
 using Task_Scheduling_API.Models;
+using Task_Scheduling_API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +29,7 @@ builder.Services.AddIdentity<AppUser, IdentityRole>(
     }).AddEntityFrameworkStores<AppDbContext>().AddDefaultTokenProviders();
 builder.Services.AddTransient<RoleSeeder>();
 builder.Services.AddTransient<AdminSeeder>();
-
+builder.Services.AddTransient<IEmailService, EmailService>();
 
 
 
