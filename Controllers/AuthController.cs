@@ -34,7 +34,7 @@ namespace Task_Scheduling_API.Controllers
             if (!ModelState.IsValid)
             {
                 _logger.LogWarning("Invalid registration model state for {Email}", model.Email);
-                return BadRequest(new { message = "An error occurred during registration", error = "Please try again later" });
+                return BadRequest(new { message = "An error occurred during registration", error = "Please try again later." });
             }
 
             var existingUser = await _userManager.FindByEmailAsync(model.Email);
@@ -90,7 +90,7 @@ namespace Task_Scheduling_API.Controllers
 
             if (user.EmailConfirmed)
             {
-                _logger.LogInformation("Email {Email} has already been confirmed", email);
+                _logger.LogInformation("Email {Email} has already been confirmed.", email);
                 return;
             }
 
@@ -126,7 +126,7 @@ namespace Task_Scheduling_API.Controllers
             if (user.EmailConfirmed)
             {
                 _logger.LogWarning("Email confirmation attempted, but email already verified for user {Email}", email);
-                return BadRequest(new { message = "Email already verified." });
+                return BadRequest(new { message = "Email already verified. Please login to continue." });
             }
 
             var result = await _userManager.ConfirmEmailAsync(user, token);
@@ -142,7 +142,8 @@ namespace Task_Scheduling_API.Controllers
             await _userManager.UpdateSecurityStampAsync(user);
 
             _logger.LogInformation("Email verified successfully: {UserId}, {Email}", user.Id, email);
-            return Ok(new { message = "Email verified successfully. Please login." });
+            return Ok(new { message = "Email verified successfully. Please login to continue." });
         }
+
     }
 }
