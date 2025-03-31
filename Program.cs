@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
 using System.Text;
+using System.Threading.RateLimiting;
 using Task_Scheduling_API.Data;
 using Task_Scheduling_API.Data.Seeders;
 using Task_Scheduling_API.Models;
@@ -55,7 +58,9 @@ builder.Services.AddAuthentication(x =>
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ClockSkew = TimeSpan.Zero,
-        RequireExpirationTime = true
+        RequireExpirationTime = true,
+        NameClaimType = ClaimTypes.Name,
+        RoleClaimType = ClaimTypes.Role
     };
 });
 builder.Services.AddAuthorization();
@@ -64,7 +69,33 @@ builder.Services.AddTransient<AdminSeeder>();
 builder.Services.AddTransient<IEmailService, EmailService>();
 
 
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = 429;
+        await context.HttpContext.Response.WriteAsync("Too many requests. Try again later.", token);
+    };
 
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString();
+
+        if (string.IsNullOrEmpty(ip))
+            ip = Guid.NewGuid().ToString();
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"ip:{ip}",
+            factory: partition => new FixedWindowRateLimiterOptions
+            {
+                AutoReplenishment = true,
+                PermitLimit = 10,
+                QueueLimit = 0,
+                Window = TimeSpan.FromMinutes(1)
+            });
+    });
+});
 
 var app = builder.Build();
 
@@ -99,6 +130,8 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
+
 
 app.MapControllers();
 

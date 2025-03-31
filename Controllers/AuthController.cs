@@ -16,14 +16,16 @@ namespace Task_Scheduling_API.Controllers
         private readonly SignInManager<AppUser> _signInManager;
         private readonly ILogger<AuthController> _logger;
         private readonly IEmailService _emailService;
+        private readonly TokenGenerator _tokenGenerator;
 
-        public AuthController(AppDbContext context, UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, ILogger<AuthController> logger, IEmailService emailService)
+        public AuthController(AppDbContext context, UserManager<AppUser> userManager, SignInManager<AppUser> signInManager, ILogger<AuthController> logger, IEmailService emailService, TokenGenerator tokenGenerator)
         {
             _context = context;
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
             _emailService = emailService;
+            _tokenGenerator = tokenGenerator;
         }
 
         [HttpPost("register")]
@@ -58,7 +60,7 @@ namespace Task_Scheduling_API.Controllers
                 return BadRequest(new { message = "User registration failed.", errors = result.Errors.Select(e => e.Description) });
 
             }
-
+            await _userManager.AddToRoleAsync(user, "User");
             try
             {
                 await VerifyEmail(user.Email);
@@ -67,11 +69,13 @@ namespace Task_Scheduling_API.Controllers
             {
                 _logger.LogError("Failed to send verification email to {Email}. {ex}", user.Email, ex);
             }
-            await _userManager.AddToRoleAsync(user, "User");
             _logger.LogInformation("User registered successfully: {UserId}, {Email}", user.Id, user.Email);
-            return StatusCode(StatusCodes.Status201Created, new { 
-                message = "Account registered successfully. Please verify your email before logging in.", 
-                email = user.Email, role = "User",
+            return StatusCode(StatusCodes.Status201Created, new 
+            { 
+                message = "Account registered successfully. Please verify your email before logging in.",
+                name = user.Name,
+                email = user.Email,
+                role = "User",
             });
 
 
@@ -139,11 +143,64 @@ namespace Task_Scheduling_API.Controllers
             }
 
             await _userManager.UpdateAsync(user);
-            await _userManager.UpdateSecurityStampAsync(user);
 
             _logger.LogInformation("Email verified successfully: {UserId}, {Email}", user.Id, email);
             return Ok(new { message = "Email verified successfully. Please login to continue." });
         }
 
+        [HttpPost]
+        public async Task<IActionResult> Login(LoginDTO model)
+        {
+            _logger.LogInformation("Login attempt for email: {Email}", model.Email);
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Invalid login model state for {Email}", model.Email);
+                return BadRequest(new { message = "An error occurred during registration", error = "Please try again later." });
+            }
+
+            var user = await _userManager.FindByEmailAsync(model.Email);
+            if (user == null)
+            {
+                _logger.LogWarning("Login attempt with invalid email {Email}", model.Email);
+                return Conflict(new { message = "Email not found. Please register to continue." });
+            }
+
+            if (!user.EmailConfirmed)
+            {
+                _logger.LogWarning("Login attempt with unconfirmed email: {Email}", model.Email);
+                return Conflict(new { message = "Email not confirmed. Please check your email for confirmation link and try again." });
+            }
+
+            var result = await _signInManager.CheckPasswordSignInAsync(user, model.Password, lockoutOnFailure: true);
+            if (!result.Succeeded)
+            {
+                _logger.LogWarning("Failed login attempt (invalid password) for email: {Email}.", user.Email);
+                return Unauthorized(new { message = "Invalid email or password. Try again later." });
+            }
+
+            if (result.IsLockedOut)
+            {
+                _logger.LogWarning("Account locked for {Email}", user.Email);
+                return Unauthorized(new { message = "Account locked. Try again later." });
+            }
+
+            var token = await _tokenGenerator.GenerateToken(user);
+            var roles = await _userManager.GetRolesAsync(user);
+
+            _logger.LogInformation("User logged in successfully: {Email}", user.Email);
+            return Ok(new 
+            { 
+                message = "Login successful" ,
+                token = token,
+                user = new
+                {
+                    name = user.Name,
+                    email = user.Email,
+                    role = roles.FirstOrDefault(),
+                }
+            });
+
+
+        }
     }
 }
