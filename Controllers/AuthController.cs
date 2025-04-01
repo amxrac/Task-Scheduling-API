@@ -292,12 +292,67 @@ namespace Task_Scheduling_API.Controllers
             });
         }
 
-        //[HttpPost("register-user")]
-        //[Authorize(Roles = "Admin")]
-        //public async Task<IActionResult> RegisterUser(RegisterDTO model)
-        //{
+        [HttpPost("register-user")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> RegisterUser(AdminRegisterDTO model)
+        {
+            var adminEmail = User.FindFirst(ClaimTypes.Email)?.Value;
 
-        //}
+            _logger.LogInformation("Registration attempt for {Email} by {Admin}", model.Email, adminEmail);
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Invalid registration model state for {Email}", model.Email);
+                return BadRequest(new { message = "An error occured during registration. Please try again later." });
+            }
+
+            var existingUser = await _userManager.FindByEmailAsync(model.Email);
+            if (existingUser != null)
+            {
+                _logger.LogWarning("Registration attempt for existing user {Email}", model.Email);
+                return Conflict(new { message = "Registration attempt for existing user." });
+            }
+
+            AppUser user = new()
+            {
+                Name = model.Name,
+                Email = model.Email,
+                UserName = model.Email
+            };
+
+            var result = await _userManager.CreateAsync(user, model.Password);
+            
+            if (!result.Succeeded)
+            {
+                _logger.LogWarning("User registration failed for {Email}: {Errors}", model.Email, string.Join(", ", result.Errors.Select(e => e.Description)));
+                return BadRequest(new { message = "User registration failed.", errors = result.Errors.Select(e => e.Description) });
+            }
+            
+            if (!new[] {"user", "admin"}.Contains(model.Role.ToLower()))
+            {
+                _logger.LogWarning("Invalid role entered: {Role}", model.Role);
+                return BadRequest(new { message = "Invalid role entered" });
+            }
+
+            await _userManager.AddToRoleAsync(user, model.Role);
+
+            try
+            {
+                await VerifyEmail(user.Email);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Failed to send verification email to {Email}. {ex}", user.Email, ex);
+            }
+            _logger.LogInformation("User registered successfully: {UserId}, {Email}", user.Id, user.Email);
+            return StatusCode(StatusCodes.Status201Created, new
+            {
+                message = "Account registered successfully. Please verify your email before logging in.",
+                name = user.Name,
+                email = user.Email,
+                role = model.Role,
+            });
+        }
 
     }
 }
