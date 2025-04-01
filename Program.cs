@@ -96,6 +96,7 @@ builder.Services.AddRateLimiter(options =>
             });
     });
 });
+builder.Services.AddScoped<TokenGenerator>();
 
 var app = builder.Build();
 

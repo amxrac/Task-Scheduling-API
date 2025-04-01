@@ -4,6 +4,8 @@ using Task_Scheduling_API.Data;
 using Task_Scheduling_API.Models;
 using Task_Scheduling_API.DTOs;
 using Task_Scheduling_API.Services;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace Task_Scheduling_API.Controllers
 {
@@ -148,7 +150,7 @@ namespace Task_Scheduling_API.Controllers
             return Ok(new { message = "Email verified successfully. Please login to continue." });
         }
 
-        [HttpPost]
+        [HttpPost("login")]
         public async Task<IActionResult> Login(LoginDTO model)
         {
             _logger.LogInformation("Login attempt for email: {Email}", model.Email);
@@ -200,6 +202,56 @@ namespace Task_Scheduling_API.Controllers
                 }
             });
 
+
+        }
+
+        [HttpGet("profile")]
+        [Authorize]
+        public async Task<IActionResult> Profile()
+        {
+            var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+
+            _logger.LogInformation("Retrieving profile details for {Email}", userEmail);
+
+            if (string.IsNullOrEmpty(userEmail))
+            {
+                _logger.LogError("Email claim missing in JWT for user {UserId}", 
+                         User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                return Unauthorized("Invalid token claims.");
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Profile access attempted with valid token but user not found");
+                return NotFound(new { message = "User not found." });
+            }
+
+            if (!user.EmailConfirmed)
+            {
+                _logger.LogWarning("Unverified user {Email} attempted to access profile", userEmail);
+                return Conflict(new
+                {
+                    message = "Email verification required. Please check your email and click on the verification link to continue."
+                });
+            }
+
+            _logger.LogInformation("User {Email} accessed their profile", userEmail);
+
+            var roles = await _userManager.GetRolesAsync(user);
+
+            return Ok(new 
+            { 
+                message = "User profile retrieved successfully.",
+                user = new
+                {
+                    id = user.Id,
+                    name = user.Name,
+                    email = user.Email,
+                    role = roles.FirstOrDefault()
+                }
+            });
 
         }
     }
