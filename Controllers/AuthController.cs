@@ -6,6 +6,7 @@ using Task_Scheduling_API.DTOs;
 using Task_Scheduling_API.Services;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 
 namespace Task_Scheduling_API.Controllers
 {
@@ -254,5 +255,49 @@ namespace Task_Scheduling_API.Controllers
             });
 
         }
+
+        [HttpGet("users")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetUsers()
+        {
+            _logger.LogInformation("Retrieving users");
+            var users = await _userManager.Users.Select(u => new
+            {
+                u.Id,
+                u.Name,
+                u.Email,
+            }).ToListAsync();
+
+            var usersWithRoles = new List<object>();
+
+            foreach (var user in users)
+            {
+                var userEntity = await _userManager.FindByIdAsync(user.Id);
+                var roles = await _userManager.GetRolesAsync(userEntity);
+
+                usersWithRoles.Add(new
+                {
+                    id = user.Id,
+                    name = user.Name,
+                    email = user.Email,
+                    role = roles
+                });
+            }
+
+            _logger.LogInformation("Users retrieved successfully");
+            return Ok(new
+            {
+                message = "Users retrieved successfuly.",
+                users = usersWithRoles
+            });
+        }
+
+        //[HttpPost("register-user")]
+        //[Authorize(Roles = "Admin")]
+        //public async Task<IActionResult> RegisterUser(RegisterDTO model)
+        //{
+
+        //}
+
     }
 }
