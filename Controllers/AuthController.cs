@@ -7,6 +7,7 @@ using Task_Scheduling_API.Services;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Mail;
 
 namespace Task_Scheduling_API.Controllers
 {
@@ -49,39 +50,59 @@ namespace Task_Scheduling_API.Controllers
                 return Conflict(new { message = "Email already registered" });
             }
 
-            AppUser user = new()
-            {
-                Name = model.Name,
-                Email = model.Email,
-                UserName = model.Email,
-            };
+            AppUser? user = null;
 
-            var result = await _userManager.CreateAsync(user, model.Password!);
-            if (!result.Succeeded)
-            {
-                _logger.LogWarning("User registration failed for {Email}: {Errors}", model.Email, string.Join(", ", result.Errors.Select(e => e.Description)));
-                return BadRequest(new { message = "User registration failed.", errors = result.Errors.Select(e => e.Description) });
-
-            }
-            await _userManager.AddToRoleAsync(user, "User");
+            await using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                user = new AppUser
+                {
+                    Name = model.Name,
+                    Email = model.Email,
+                    UserName = model.Email
+                };
+
+                var createResult = await _userManager.CreateAsync(user, model.Password);
+
+                if (!createResult.Succeeded)
+                    throw new Exception($"User creation failed: {string.Join(", ", createResult.Errors)}");
+
+                await _userManager.AddToRoleAsync(user, "User");
+
                 await VerifyEmail(user.Email);
+
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("User account {Email} successfully registered at {Timestamp}", user.Email, DateTime.UtcNow);
+                return StatusCode(StatusCodes.Status201Created, new
+                {
+                    message = "Account registered successfully. Verification email sent.",
+                    name = user.Name,
+                    email = user.Email,
+                    role = "user"
+                });
+            }
+            catch (ApplicationException ex) when (ex.InnerException is SmtpException)
+            {
+                _logger.LogError(ex, "Verification email failed to send for email {Email}", model.Email);
+
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { message = "Registration failed due to email error. Please try again later." });
             }
             catch (Exception ex)
             {
-                _logger.LogError("Failed to send verification email to {Email}. {ex}", user.Email, ex);
+                _logger.LogError(ex, "User creation failed for email {Email}", model.Email);
+
+                await transaction.RollbackAsync();
+
+                if (user != null)
+                {
+                    await _userManager.DeleteAsync(user);
+                    _logger.LogInformation("Deleted failed registration for {Email}", user.Email);
+                }
+
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "User registration failed. Please try again later, and ensure to use a valid email." });
             }
-            _logger.LogInformation("User registered successfully: {UserId}, {Email}", user.Id, user.Email);
-            return StatusCode(StatusCodes.Status201Created, new 
-            { 
-                message = "Account registered successfully. Please verify your email before logging in.",
-                name = user.Name,
-                email = user.Email,
-                role = "User",
-            });
-
-
         }
 
         private async Task VerifyEmail(string email)
@@ -300,58 +321,75 @@ namespace Task_Scheduling_API.Controllers
 
             _logger.LogInformation("Registration attempt for {Email} by {Admin}", model.Email, adminEmail);
 
-            if (!ModelState.IsValid)
+            if (!new[] { "user", "admin" }.Contains(model.Role.ToLower()))
             {
-                _logger.LogWarning("Invalid registration model state for {Email}", model.Email);
-                return BadRequest(new { message = "An error occured during registration. Please try again later." });
+                _logger.LogWarning("Invalid role entered: {Role} for {Email}", model.Role, model.Email);
+                return BadRequest(new { message = "Invalid role entered. Allowed roles: User, Admin" });
             }
 
             var existingUser = await _userManager.FindByEmailAsync(model.Email);
             if (existingUser != null)
             {
-                _logger.LogWarning("Registration attempt for existing user {Email}", model.Email);
-                return Conflict(new { message = "Registration attempt for existing user." });
+                _logger.LogWarning("Registration attempt for existing user: {Email}", model.Email);
+                return Conflict(new { message = "Email already registered." });
             }
 
-            AppUser user = new()
-            {
-                Name = model.Name,
-                Email = model.Email,
-                UserName = model.Email
-            };
+            AppUser? user = null;
 
-            var result = await _userManager.CreateAsync(user, model.Password);
-            
-            if (!result.Succeeded)
-            {
-                _logger.LogWarning("User registration failed for {Email}: {Errors}", model.Email, string.Join(", ", result.Errors.Select(e => e.Description)));
-                return BadRequest(new { message = "User registration failed.", errors = result.Errors.Select(e => e.Description) });
-            }
-            
-            if (!new[] {"user", "admin"}.Contains(model.Role.ToLower()))
-            {
-                _logger.LogWarning("Invalid role entered: {Role}", model.Role);
-                return BadRequest(new { message = "Invalid role entered" });
-            }
-
-            await _userManager.AddToRoleAsync(user, model.Role);
-
+            await using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                user = new AppUser
+                {
+                    Name = model.Name,
+                    Email = model.Email,
+                    UserName = model.Email
+                };
+
+                var createResult = await _userManager.CreateAsync(user, model.Password);
+
+                if (!createResult.Succeeded)
+                    throw new Exception($"User creation failed: {string.Join(", ", createResult.Errors)}");
+
+                var roleResult = await _userManager.AddToRoleAsync(user, model.Role);
+
+                if (!roleResult.Succeeded)
+                    throw new Exception($"Role assignment failed: {string.Join(", ", roleResult.Errors)}");
+
                 await VerifyEmail(user.Email);
+
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Successfully registered user {UserId} at {Timestamp}", user.Id, DateTime.UtcNow);
+                return StatusCode(StatusCodes.Status201Created, new
+                {
+                    message = "User created successfully. Verification email sent.",
+                    name = user.Name,
+                    email = user.Email,
+                    role = model.Role.ToLower()
+                });
+            }
+            catch (ApplicationException ex) when (ex.InnerException is SmtpException)
+            {
+                _logger.LogError(ex, "Verification email failed to send for email {Email}", model.Email);
+
+                await transaction.RollbackAsync();
+                return StatusCode(500, new { message = "Registration failed due to email error. Please try again later." });
             }
             catch (Exception ex)
             {
-                _logger.LogError("Failed to send verification email to {Email}. {ex}", user.Email, ex);
+                _logger.LogError(ex, "User creation failed for email {Email}", model.Email);
+
+                await transaction.RollbackAsync();
+
+                if (user != null)
+                {
+                    await _userManager.DeleteAsync(user);
+                    _logger.LogInformation("Deleted failed registration for {Email}", user.Email);
+                }
+
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "User registration failed. Please try again later, and ensure to use a valid email." });
             }
-            _logger.LogInformation("User registered successfully: {UserId}, {Email}", user.Id, user.Email);
-            return StatusCode(StatusCodes.Status201Created, new
-            {
-                message = "Account registered successfully. Please verify your email before logging in.",
-                name = user.Name,
-                email = user.Email,
-                role = model.Role,
-            });
         }
 
     }
