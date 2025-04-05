@@ -33,7 +33,7 @@ namespace Task_Scheduling_API.Controllers
         }
 
         [HttpPost("register")]
-        public async Task<IActionResult> Register(RegisterDTO model)
+        public async Task<IActionResult> Register([FromBody] RegisterDTO model)
         {
             _logger.LogInformation("Registration attempt for email: {Email}", model.Email);
 
@@ -167,7 +167,7 @@ namespace Task_Scheduling_API.Controllers
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login(LoginDTO model)
+        public async Task<IActionResult> Login([FromBody] LoginDTO model)
         {
             _logger.LogInformation("Login attempt for email: {Email}", model.Email);
             if (!ModelState.IsValid)
@@ -309,7 +309,7 @@ namespace Task_Scheduling_API.Controllers
 
         [HttpPost("register-user")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> RegisterUser(AdminRegisterDTO model)
+        public async Task<IActionResult> RegisterUser([FromBody] AdminRegisterDTO model)
         {
             var adminEmail = User.FindFirst(ClaimTypes.Email)?.Value;
 

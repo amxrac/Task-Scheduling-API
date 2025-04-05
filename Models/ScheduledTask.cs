@@ -14,7 +14,7 @@
         public DateTime LastRunAt { get; set; }
         public int RetryCount { get; set; } = 0;
         public int MaxRetries { get; set; } = 3;
-        public required bool IsDeleted { get; set; }
+        public bool IsDeleted { get; set; }
     }
 
     public enum TaskStatus { Pending, Queued, Completed, Failed }

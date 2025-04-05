@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.RateLimiting;
+using Task_Scheduling_API.Authorization;
 using Task_Scheduling_API.Data;
 using Task_Scheduling_API.Data.Seeders;
 using Task_Scheduling_API.Models;
@@ -63,7 +65,12 @@ builder.Services.AddAuthentication(x =>
         RoleClaimType = ClaimTypes.Role
     };
 });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("EmailConfirmed", policy =>
+    policy.Requirements.Add(new EmailConfirmedRequirement()));
+});
+builder.Services.AddScoped<IAuthorizationHandler, EmailConfirmedHandler>();
 builder.Services.AddTransient<RoleSeeder>();
 builder.Services.AddTransient<AdminSeeder>();
 builder.Services.AddTransient<IEmailService, EmailService>();
