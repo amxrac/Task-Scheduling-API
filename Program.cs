@@ -104,6 +104,11 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 builder.Services.AddScoped<TokenGenerator>();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+    });
 
 var app = builder.Build();
 
