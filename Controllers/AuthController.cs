@@ -95,12 +95,6 @@ namespace Task_Scheduling_API.Controllers
 
                 await transaction.RollbackAsync();
 
-                if (user != null)
-                {
-                    await _userManager.DeleteAsync(user);
-                    _logger.LogInformation("Deleted failed registration for {Email}", user.Email);
-                }
-
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "User registration failed. Please try again later, and ensure to use a valid email." });
             }
         }
@@ -381,12 +375,6 @@ namespace Task_Scheduling_API.Controllers
                 _logger.LogError(ex, "User creation failed for email {Email}", model.Email);
 
                 await transaction.RollbackAsync();
-
-                if (user != null)
-                {
-                    await _userManager.DeleteAsync(user);
-                    _logger.LogInformation("Deleted failed registration for {Email}", user.Email);
-                }
 
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "User registration failed. Please try again later, and ensure to use a valid email." });
             }
