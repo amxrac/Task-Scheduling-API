@@ -6,6 +6,7 @@ using Task_Scheduling_API.Data;
 using Task_Scheduling_API.DTOs;
 using Task_Scheduling_API.Services;
 using Task_Scheduling_API.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace Task_Scheduling_API.Controllers
 {
@@ -88,12 +89,12 @@ namespace Task_Scheduling_API.Controllers
             return StatusCode(StatusCodes.Status201Created, new
             {
                 message = "task created successfully",
+                id = scheduledTask.Id,
                 title = model.Title,
                 description = model.Description,
                 status = model.Status,
                 type = model.Type,
                 ScheduledAt = CalculateScheduledTime(model),
-
             });
         }
 
@@ -120,6 +121,60 @@ namespace Task_Scheduling_API.Controllers
         {
             return Ok(new { message = "test successful" });
 
+        }
+
+        [HttpGet("{id:int}")]
+        public async Task<IActionResult> GetTask(int id)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogError("JWT claim missing or invalid");
+                return Unauthorized("Missing or Invalid token.");
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Profile access attempted with valid token but user not found");
+                return NotFound(new { message = "User not found." });
+            }
+
+            _logger.LogInformation("Fetching task details for {userEmail}", user.Email);
+
+            if (id <= 0)
+            {
+                _logger.LogError("Invalid task id: {id} entered by user: {userEmail}", id, user.Email);
+                return BadRequest(new { message = "Invalid id." });
+            }
+
+            var task = await _context.ScheduledTasks.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id);
+
+            if (task == null)
+            {
+                _logger.LogError("Task {id} not found", id);
+                return NotFound(new { message = "Task not found. Ensure the Id is valid", id = id});
+            }
+
+            _logger.LogInformation("Task {id} details retrieved successfully for {userEmail}", id, user.Email);
+
+            return Ok(new
+            {
+                message = "Task retrieved successfully",
+                id = task.Id,
+                title = task.Title,
+                description = task.Description,
+                status = task.Status,
+                type = task.Type,
+                ScheduledAt = task.ScheduledAt,
+                NextRunAt = task.NextRunAt,
+                LastRunAt = task.LastRunAt,
+                RetryCount = task.RetryCount,
+                MaxRetries = task.MaxRetries,
+                IsDeleted = task.IsDeleted
+            });
         }
 
     }
