@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Task_Scheduling_API.Authorization;
 using Task_Scheduling_API.Data;
@@ -104,11 +105,7 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 builder.Services.AddScoped<TokenGenerator>();
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-    });
+
 
 var app = builder.Build();
 

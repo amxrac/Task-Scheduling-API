@@ -12,6 +12,8 @@
         public DateTime? ScheduledAt { get; set; }
         public DateTime? NextRunAt { get; set; }
         public DateTime? LastRunAt { get; set; }
+        public DateTime? ModifiedAt { get; set; }
+        public TimeSpan? RecurrenceInterval { get; set; }
         public int RetryCount { get; set; } = 0;
         public int MaxRetries { get; set; } = 3;
         public bool IsDeleted { get; set; }

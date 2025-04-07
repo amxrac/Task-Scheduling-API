@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Task_Scheduling_API.Data;
@@ -11,9 +12,11 @@ using Task_Scheduling_API.Data;
 namespace Task_Scheduling_API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250406084443_AddModifiedAtFieldToScheduledTaskModel")]
+    partial class AddModifiedAtFieldToScheduledTaskModel
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -248,9 +251,6 @@ namespace Task_Scheduling_API.Migrations
 
                     b.Property<DateTime?>("NextRunAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<TimeSpan?>("RecurrenceInterval")
-                        .HasColumnType("interval");
 
                     b.Property<int>("RetryCount")
                         .HasColumnType("integer");

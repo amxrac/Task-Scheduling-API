@@ -25,7 +25,7 @@ namespace Task_Scheduling_API.Controllers
             _userManager = userManager;
         }
 
-        [HttpPost("task")]
+        [HttpPost]
         public async Task<IActionResult> CreateTask([FromBody] CreateTaskDTO model)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -33,7 +33,7 @@ namespace Task_Scheduling_API.Controllers
             if (string.IsNullOrEmpty(userId))
             {
                 _logger.LogError("JWT claim missing or invalid");
-                return Unauthorized("Missing or Invalid token.");
+                return Unauthorized(new { message = "Missing or Invalid token." });
             }
 
             var user = await _userManager.GetUserAsync(User);
@@ -46,82 +46,107 @@ namespace Task_Scheduling_API.Controllers
 
             _logger.LogInformation("Task creation for user: {Email}", user.Email);
 
-            if (model.ScheduledAt.HasValue && model.ScheduledAt.Value < DateTime.UtcNow)
-            {
-                _logger.LogError("Invalid time entered by {userEmail}: {Time}", user.Email, model.ScheduledAt);
-                return BadRequest(new { message = "Scheduled time cannot be in the past." });
-            }
-
-            if (!Enum.IsDefined(typeof(Models.TaskStatus), model.Status))
-            {
-                return BadRequest(new { message = "Invalid status value. Accepted values are: Pending, Queued, Completed, Failed." });
-            }
-
-            if (!Enum.IsDefined(typeof(Models.TaskType), model.Type))
-            {
-                return BadRequest(new { message = "Invalid status value. Accepted values are: OneOff, Delayed, Recurring." });
-            }
-
             if (!ModelState.IsValid)
             {
                 _logger.LogError("Invalid model state {ex} by {userEmail}", ModelState, user.Email);
                 return BadRequest(new { message = "Invalid details provided.", errors = ModelState });
             }
 
-            var scheduledTask = new ScheduledTask
+            if (!Enum.IsDefined(typeof(Models.TaskType), model.Type))
             {
-                UserId = userId,
-                Title = model.Title,
-                Description = model.Description,
-                Status = model.Status,
-                Type = model.Type,
-                CreatedAt = DateTime.UtcNow,
-                ScheduledAt = CalculateScheduledTime(model),
-                NextRunAt = CalculateScheduledTime(model)
-            };
-
-            _logger.LogInformation("New task created by {userEmail} at {Timestamp}", user.Email, DateTime.UtcNow);
-            await _context.ScheduledTasks.AddAsync(scheduledTask);
-            await _context.SaveChangesAsync();
-
-            _logger.LogInformation("New task by user {userEmail} saved", user.Email);
-
-            return StatusCode(StatusCodes.Status201Created, new
-            {
-                message = "task created successfully",
-                id = scheduledTask.Id,
-                title = model.Title,
-                description = model.Description,
-                status = model.Status,
-                type = model.Type,
-                ScheduledAt = CalculateScheduledTime(model),
-            });
-        }
-
-        private DateTime CalculateScheduledTime(CreateTaskDTO model)
-        {
-            if (model.ScheduledAt.HasValue && model.DelayMinutes.HasValue)
-            {
-                return model.ScheduledAt.Value.AddMinutes(model.DelayMinutes.Value);
-            }
-            else if (model.ScheduledAt.HasValue && model.DelayMinutes == null)
-            {
-                return model.ScheduledAt.Value;
-            }
-            else if (model.DelayMinutes.HasValue && model.ScheduledAt == null)
-            {
-                return DateTime.UtcNow.AddMinutes(model.DelayMinutes.Value);
+                return BadRequest(new { message = "Invalid type value. Accepted values are: 0 (OneOff), 1 (Delayed), 2 (Recurring)." });
             }
 
-            return DateTime.UtcNow;
+            DateTime? scheduledAt = null;
+            TimeSpan? recurrenceInterval = null;
+
+            switch (model.Type)
+            {
+                case TaskType.OneOff:
+                    if (model.ScheduledAt.HasValue && model.ScheduledAt < DateTime.UtcNow)
+                        return BadRequest(new { message = "Scheduled time cannot be in the past." });
+
+                    scheduledAt = model.ScheduledAt ?? (model.DelayMinutes.HasValue ? DateTime.UtcNow.AddMinutes(model.DelayMinutes.Value) : DateTime.UtcNow);
+                    break;
+
+                case TaskType.Delayed:
+                    if (!model.DelayMinutes.HasValue)
+                        return BadRequest(new { message = "DelayMinutes is required for Delayed tasks." });
+
+                    scheduledAt = DateTime.UtcNow.AddMinutes(model.DelayMinutes.Value);
+                    break;
+
+                case TaskType.Recurring:
+                    if (!model.ScheduledAt.HasValue)
+                        return BadRequest(new { message = "ScheduledAt is required for Recurring tasks." });
+
+                    if (model.ScheduledAt.Value < DateTime.UtcNow)
+                        return BadRequest(new { message = "Scheduled time cannot be in the past." });
+
+                    if (!model.RecurrenceInterval.HasValue)
+                        return BadRequest(new { message = "RecurrenceInterval is required for Recurring tasks." });
+
+                    if (string.IsNullOrEmpty(model.RecurrenceUnit) ||
+                        (model.RecurrenceUnit.ToLower() != "h" && model.RecurrenceUnit.ToLower() != "d"))
+                    {
+                        return BadRequest(new { message = "RecurrenceUnit must be specified for recurring tasks. h for hour(s) and d for day(s)" });
+                    }
+
+                    scheduledAt = model.ScheduledAt;
+
+                    if (model.RecurrenceUnit.ToLower() == "h")
+                        recurrenceInterval = TimeSpan.FromHours(model.RecurrenceInterval.Value);
+                    else
+                        recurrenceInterval = TimeSpan.FromDays(model.RecurrenceInterval.Value);
+                    break;
+            }
+
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var scheduledTask = new ScheduledTask
+                {
+                    UserId = userId,
+                    Title = model.Title,
+                    Description = model.Description,
+                    Status = Models.TaskStatus.Pending,
+                    Type = model.Type,
+                    ScheduledAt = scheduledAt,
+                    NextRunAt = scheduledAt,
+                    RecurrenceInterval = recurrenceInterval
+                };
+
+                _logger.LogInformation("New task created by {userEmail} at {Timestamp}", user.Email, DateTime.UtcNow);
+                await _context.ScheduledTasks.AddAsync(scheduledTask);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("New task by user {userEmail} saved", user.Email);
+
+                return StatusCode(StatusCodes.Status201Created, new
+                {
+                    message = "task created successfully",
+                    id = scheduledTask.Id,
+                    createdAt = scheduledTask.CreatedAt,
+                    title = scheduledTask.Title,
+                    description = scheduledTask.Description,
+                    status = Models.TaskStatus.Pending,
+                    type = scheduledTask.Type,
+                    ScheduledAt = scheduledTask.ScheduledAt,
+                    NextRunAt = scheduledTask.NextRunAt,
+                    recurrenceInterval = scheduledTask.RecurrenceInterval
+                });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error during task creation by {userEmail}", user.Email);
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = "An error occurred while creating your task. Please try again later." });
+            }
+
         }
 
-        [HttpGet("test")]
-        public async Task<IActionResult> Test()
-        {
-            return Ok(new { message = "test successful" });
-
-        }
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetTask(int id)
@@ -131,7 +156,7 @@ namespace Task_Scheduling_API.Controllers
             if (string.IsNullOrEmpty(userId))
             {
                 _logger.LogError("JWT claim missing or invalid");
-                return Unauthorized("Missing or Invalid token.");
+                return Unauthorized(new { message = "Missing or Invalid token." });
             }
 
             var user = await _userManager.GetUserAsync(User);
@@ -177,5 +202,139 @@ namespace Task_Scheduling_API.Controllers
             });
         }
 
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> UpdateTask(int id, [FromBody] UpdateTaskDTO model)
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogError("JWT claim missing or invalid");
+                return Unauthorized(new { message = "Missing or Invalid token." });
+            }
+
+            var user = await _userManager.GetUserAsync(User);
+
+            if (user == null)
+            {
+                _logger.LogWarning("Profile access attempted with valid token but user not found");
+                return NotFound(new { message = "User not found." });
+            }
+
+            _logger.LogInformation("Updating task {id} for {userEmail}", id, user.Email);
+
+            var task = await _context.ScheduledTasks.FirstOrDefaultAsync(t => t.Id == id);
+
+            if (task == null)
+            {
+                _logger.LogError("Task {id} not found", id);
+                return NotFound(new { message = "Task not found. Ensure the Id is valid", id = id });
+            }
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogError("Invalid model state {ex} by {userEmail}", ModelState, user.Email);
+                return BadRequest(new { message = "Invalid details provided.", errors = ModelState });
+            }
+
+            if (!Enum.IsDefined(typeof(Models.TaskType), model.Type))
+            {
+                return BadRequest(new { message = "Invalid type value. Accepted values are: 0 (OneOff), 1 (Delayed), 2 (Recurring)." });
+            }
+
+            DateTime? scheduledAt = null;
+            TimeSpan? recurrenceInterval = null;
+
+            switch (model.Type)
+            {
+                case TaskType.OneOff:
+                    if (model.ScheduledAt.HasValue && model.ScheduledAt < DateTime.UtcNow)
+                        return BadRequest(new { message = "Scheduled time cannot be in the past." });
+
+                    scheduledAt = model.ScheduledAt ?? (model.DelayMinutes.HasValue ? DateTime.UtcNow.AddMinutes(model.DelayMinutes.Value) : DateTime.UtcNow);
+                    break;
+
+                case TaskType.Delayed:
+                    if (!model.DelayMinutes.HasValue)
+                        return BadRequest(new { message = "DelayMinutes is required for Delayed tasks." });
+
+                    scheduledAt = DateTime.UtcNow.AddMinutes(model.DelayMinutes.Value);
+                    break;
+
+                case TaskType.Recurring:
+                    if (!model.ScheduledAt.HasValue)
+                        return BadRequest(new { message = "ScheduledAt is required for Recurring tasks." });
+
+                    if (model.ScheduledAt.Value < DateTime.UtcNow)
+                        return BadRequest(new { message = "Scheduled time cannot be in the past." });
+
+                    if (!model.RecurrenceInterval.HasValue)
+                        return BadRequest(new { message = "RecurrenceInterval is required for Recurring tasks." });
+
+                    if (string.IsNullOrEmpty(model.RecurrenceUnit) ||
+                        (model.RecurrenceUnit.ToLower() != "h" && model.RecurrenceUnit.ToLower() != "d"))
+                    {
+                        return BadRequest(new { message = "RecurrenceUnit must be specified for recurring tasks. h for hour(s) and d for day(s)" });
+                    }
+
+                    scheduledAt = model.ScheduledAt;
+
+                    if (model.RecurrenceUnit.ToLower() == "h")
+                        recurrenceInterval = TimeSpan.FromHours(model.RecurrenceInterval.Value);
+                    else
+                        recurrenceInterval = TimeSpan.FromDays(model.RecurrenceInterval.Value);
+                    break;
+            }
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                if (model.Title != null)
+                    task.Title = model.Title;
+                if (model.Description != null)
+                    task.Description = model.Description;
+                if (model.Type.HasValue)
+                    task.Type = model.Type.Value;
+
+
+                task.ScheduledAt = scheduledAt;
+                task.NextRunAt = scheduledAt;
+                task.RecurrenceInterval = recurrenceInterval;
+                task.ModifiedAt = DateTime.UtcNow;
+
+                _context.ScheduledTasks.Update(task);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Task {id} updated successfully by {userEmail}", id, user.Email);
+
+                return Ok(new
+                {
+                    message = "Task updated successfully",
+                    id = id,
+                    title = task.Title,
+                    description = task.Description,
+                    status = task.Status,
+                    type = task.Type,
+                    ModifiedAt = task.ModifiedAt,
+                    ScheduledAt = task.ScheduledAt,
+                    NextRunAt = task.NextRunAt,
+                    LastRunAt = task.LastRunAt,
+                    RetryCount = task.RetryCount,
+                    MaxRetries = task.MaxRetries,
+                    recurrenceInterval = task.RecurrenceInterval
+                });
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error during update task operation");
+                return StatusCode(StatusCodes.Status500InternalServerError,
+                    new { message = "An error occurred while updating your task. Please try again later." });
+            }
+
+        }
+    
+        
     }
 }
