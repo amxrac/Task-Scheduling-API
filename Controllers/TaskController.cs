@@ -153,12 +153,6 @@ namespace Task_Scheduling_API.Controllers
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-            if (string.IsNullOrEmpty(userId))
-            {
-                _logger.LogError("JWT claim missing or invalid");
-                return Unauthorized(new { message = "Missing or Invalid token." });
-            }
-
             var user = await _userManager.GetUserAsync(User);
 
             if (user == null)
@@ -206,12 +200,6 @@ namespace Task_Scheduling_API.Controllers
         public async Task<IActionResult> UpdateTask(int id, [FromBody] UpdateTaskDTO model)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userId))
-            {
-                _logger.LogError("JWT claim missing or invalid");
-                return Unauthorized(new { message = "Missing or Invalid token." });
-            }
 
             var user = await _userManager.GetUserAsync(User);
 
@@ -334,7 +322,54 @@ namespace Task_Scheduling_API.Controllers
             }
 
         }
-    
-        
+
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetTasks()
+        {
+            try
+            {
+                var user = await _userManager.GetUserAsync(User);
+
+                if (user == null)
+                {
+                    _logger.LogWarning("Profile access attempted with valid token but user not found");
+                    return NotFound(new { message = "User not found." });
+                }
+
+                _logger.LogInformation("Retrieving tasks for {adminEmail}", user.Email);
+
+                var tasks = await _context.ScheduledTasks.AsNoTracking().Select(t => new
+                {
+                    t.Id,
+                    t.UserId,
+                    t.Title,
+                    t.Description,
+                    t.Status,
+                    t.Type,
+                    t.CreatedAt,
+                    t.ScheduledAt,
+                    t.NextRunAt,
+                    t.LastRunAt,
+                    t.ModifiedAt,
+                    t.RecurrenceInterval,
+                    t.RetryCount,
+                    t.IsDeleted
+                }).ToListAsync();
+
+                _logger.LogInformation("Tasks retrieved successfully for {adminEmail}", user.Email);
+
+                return Ok(new
+                {
+                    message = "Tasks retrieved successfully.",
+                    tasks = tasks
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while retrieving tasks.");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An error occurred while retrieving tasks. Please try again later." });
+            }
+        }
     }
 }
