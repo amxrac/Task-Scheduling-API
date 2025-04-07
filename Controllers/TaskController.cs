@@ -7,6 +7,7 @@ using Task_Scheduling_API.DTOs;
 using Task_Scheduling_API.Services;
 using Task_Scheduling_API.Models;
 using Microsoft.EntityFrameworkCore;
+using Org.BouncyCastle.Pqc.Crypto.Lms;
 
 namespace Task_Scheduling_API.Controllers
 {
@@ -25,17 +26,11 @@ namespace Task_Scheduling_API.Controllers
             _userManager = userManager;
         }
 
+
         [HttpPost]
         public async Task<IActionResult> CreateTask([FromBody] CreateTaskDTO model)
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
-            if (string.IsNullOrEmpty(userId))
-            {
-                _logger.LogError("JWT claim missing or invalid");
-                return Unauthorized(new { message = "Missing or Invalid token." });
-            }
-
             var user = await _userManager.GetUserAsync(User);
 
             if (user == null)
@@ -150,9 +145,7 @@ namespace Task_Scheduling_API.Controllers
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetTask(int id)
-        {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
+        {            
             var user = await _userManager.GetUserAsync(User);
 
             if (user == null)
@@ -176,6 +169,11 @@ namespace Task_Scheduling_API.Controllers
                 _logger.LogError("Task {id} not found", id);
                 return NotFound(new { message = "Task not found. Ensure the Id is valid", id = id});
             }
+            if (task.IsDeleted == true)
+            {
+                _logger.LogError("Task {id} has already been deleted", id);
+                return NotFound(new { message = "Task has been deleted.", id = id });
+            }
 
             _logger.LogInformation("Task {id} details retrieved successfully for {userEmail}", id, user.Email);
 
@@ -196,11 +194,10 @@ namespace Task_Scheduling_API.Controllers
             });
         }
 
+
         [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdateTask(int id, [FromBody] UpdateTaskDTO model)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-
             var user = await _userManager.GetUserAsync(User);
 
             if (user == null)
@@ -323,6 +320,7 @@ namespace Task_Scheduling_API.Controllers
 
         }
 
+
         [HttpGet]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetTasks()
@@ -370,6 +368,46 @@ namespace Task_Scheduling_API.Controllers
                 _logger.LogError(ex, "An error occurred while retrieving tasks.");
                 return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An error occurred while retrieving tasks. Please try again later." });
             }
+        }
+
+
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> DeleteTask(int id)
+        {            
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                _logger.LogWarning("Profile access attempted with valid token but user not found");
+                return NotFound(new { message = "User not found." });
+            }
+
+            if (id <= 0)
+            {
+                _logger.LogError("Invalid task id: {id} entered by user: {userEmail}", id, user.Email);
+                return BadRequest(new { message = "Invalid id." });
+            }
+
+            var task = await _context.ScheduledTasks.FindAsync(id);
+
+            if (task == null)
+            {
+                _logger.LogWarning("Invalid task {id} selected for deletion", id);
+                return NotFound(new { message = $"Task with id {id} not found." });
+            }
+
+            _logger.LogInformation("Deleting task {id} for user: {userEmail}", id,user.Email);
+
+            if (task.IsDeleted == true)
+            {
+                _logger.LogWarning("User {userEmail} requesting deletion for already deleted task {id}", user.Email, id);
+                return NotFound(new { message = $"Task with id {id} has already been deleted." });
+            }
+
+            task.IsDeleted = true;
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Task {id} deleted by user {userEmail} successfully", id, user.Email);
+            return Ok(new { message = $"Task with id {id} has been deleted successfully." });
         }
     }
 }
