@@ -103,6 +103,7 @@ namespace Task_Scheduling_API.Controllers
                 {
                     UserId = userId,
                     Title = model.Title,
+                    CreatedAt = DateTime.UtcNow,
                     Description = model.Description,
                     Status = Models.TaskStatus.Pending,
                     Type = model.Type,
@@ -145,7 +146,9 @@ namespace Task_Scheduling_API.Controllers
 
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetTask(int id)
-        {            
+        {
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
             var user = await _userManager.GetUserAsync(User);
 
             if (user == null)
@@ -169,10 +172,17 @@ namespace Task_Scheduling_API.Controllers
                 _logger.LogError("Task {id} not found", id);
                 return NotFound(new { message = "Task not found. Ensure the Id is valid", id = id});
             }
+
             if (task.IsDeleted == true)
             {
                 _logger.LogError("Task {id} has already been deleted", id);
-                return NotFound(new { message = "Task has been deleted.", id = id });
+                return NotFound(new { message = $"Task {id} has been deleted." });
+            }
+
+            if (task.UserId != userId)
+            {
+                _logger.LogError("Task {id} not found for user {userEmail}", id, user.Email);
+                return NotFound(new { message = "Task not found. Ensure the Id is valid" });
             }
 
             _logger.LogInformation("Task {id} details retrieved successfully for {userEmail}", id, user.Email);
@@ -409,5 +419,7 @@ namespace Task_Scheduling_API.Controllers
             _logger.LogInformation("Task {id} deleted by user {userEmail} successfully", id, user.Email);
             return Ok(new { message = $"Task with id {id} has been deleted successfully." });
         }
+    
+        
     }
 }

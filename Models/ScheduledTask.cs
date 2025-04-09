@@ -8,7 +8,7 @@
         public string? Description { get; set; }
         public required TaskStatus Status { get; set; }
         public required TaskType Type { get; set; }
-        public DateTime CreatedAt = DateTime.UtcNow;
+        public DateTime CreatedAt { get; set; }
         public DateTime? ScheduledAt { get; set; }
         public DateTime? NextRunAt { get; set; }
         public DateTime? LastRunAt { get; set; }
