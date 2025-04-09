@@ -32,6 +32,12 @@ namespace Task_Scheduling_API.Controllers
             _tokenGenerator = tokenGenerator;
         }
 
+
+        /// <summary>
+        /// Creates a new user and sends a verification email.
+        /// </summary>
+        /// <param name= "model" > User details including name, email, password, and confirm password.</param>
+        /// <returns>201 with user details on success, 400/500 on failure.</returns>
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDTO model)
         {
@@ -126,6 +132,11 @@ namespace Task_Scheduling_API.Controllers
             _logger.LogInformation("Verification email sent to {Email}", email);
         }
 
+        /// <summary>
+        /// Confirms the user email.
+        /// </summary>
+        /// <param> User email and verification token.</param>
+        /// <returns>201 with user details on success, 400/500 on failure.</returns>
         [HttpGet("confirm-email")]
         public async Task<IActionResult> ConfirmEmail(string email, string token)
         {
@@ -166,6 +177,11 @@ namespace Task_Scheduling_API.Controllers
             return Ok(new { message = "Email verified successfully. Please login to continue." });
         }
 
+        /// <summary>
+        /// Logs a user in.
+        /// </summary>
+        /// <param name= "model" > User details including email and password.</param>
+        /// <returns>201 with user details on success, 400/500 on failure.</returns>
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginDTO model)
         {
@@ -221,6 +237,10 @@ namespace Task_Scheduling_API.Controllers
 
         }
 
+        /// <summary>
+        /// Retrieves authenticated user details.
+        /// </summary>
+        /// <returns>201 with user details on success, 400/500 on failure.</returns>
         [HttpGet("profile")]
         [Authorize]
         public async Task<IActionResult> Profile()
@@ -271,6 +291,10 @@ namespace Task_Scheduling_API.Controllers
 
         }
 
+        /// <summary>
+        /// Retrieves all users for the authenticated admin user.
+        /// </summary>
+        /// <returns>201 with users success, 400/500 on failure.</returns>
         [HttpGet("users")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetUsers()
@@ -307,6 +331,11 @@ namespace Task_Scheduling_API.Controllers
             });
         }
 
+        /// <summary>
+        /// Creates a new user by an authenicated admin user.
+        /// </summary>
+        /// <param name= "model" > User details including name, email, password, and confirm password.</param>
+        /// <returns>201 with user details on success, 400/500 on failure.</returns>
         [HttpPost("register-user")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> RegisterUser([FromBody] AdminRegisterDTO model)

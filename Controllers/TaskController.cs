@@ -27,6 +27,11 @@ namespace Task_Scheduling_API.Controllers
         }
 
 
+        /// <summary>
+        /// Creates a new scheduled task for the authenticated user.
+        /// </summary>
+        /// <param name= "model" > Task details including type, schedule, and title.</param>
+        /// <returns>201 with task details on success, 400/500 on failure.</returns>
         [HttpPost]
         public async Task<IActionResult> CreateTask([FromBody] CreateTaskDTO model)
         {
@@ -144,6 +149,12 @@ namespace Task_Scheduling_API.Controllers
         }
 
 
+
+        /// <summary>
+        /// Retrieves a specific task by ID for the authenticated user.
+        /// </summary>
+        /// <param name="id">The ID of the task to retrieve.</param>
+        /// <returns>201 with task details on success, 404 if not found.</returns>
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetTask(int id)
         {
@@ -205,6 +216,12 @@ namespace Task_Scheduling_API.Controllers
         }
 
 
+
+        /// <summary>
+        /// Updates a specific task by ID for the authenticated user.
+        /// </summary>
+        /// <param name="model">The ID of the task to update.</param>
+        /// <returns>200 with task details, 404 if not found.</returns>
         [HttpPut("{id:int}")]
         public async Task<IActionResult> UpdateTask(int id, [FromBody] UpdateTaskDTO model)
         {
@@ -331,6 +348,11 @@ namespace Task_Scheduling_API.Controllers
         }
 
 
+
+        /// <summary>
+        /// Retrieves all tasks for an authenticated admin user.
+        /// </summary>
+        /// <returns>200 with tasks, 404 if not found.</returns>
         [HttpGet]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetTasks()
@@ -381,6 +403,11 @@ namespace Task_Scheduling_API.Controllers
         }
 
 
+        /// <summary>
+        /// Deletes a specific task by ID for the authenticated user.
+        /// </summary>
+       /// <param name="id">The ID of the task to delete.</param>
+        /// <returns>200 with success message, 404 if not found.</returns>
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> DeleteTask(int id)
         {            

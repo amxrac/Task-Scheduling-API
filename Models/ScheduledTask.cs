@@ -17,6 +17,8 @@
         public int RetryCount { get; set; } = 0;
         public int MaxRetries { get; set; } = 3;
         public bool IsDeleted { get; set; }
+        public bool NotificationSent { get; set; }
+        public DateTime? NotificationSentAt { get; set; }
     }
 
     public enum TaskStatus { Pending, Queued, Completed, Failed }
