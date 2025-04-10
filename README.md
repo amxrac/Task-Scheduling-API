@@ -50,7 +50,7 @@ Used when `TaskType` is `Recurring`:
    cd Task-Scheduling-API
    ```
 2. **Config**:
-     - Create `appsettings.json` in the project root (not tracked—see .gitignore)
+     - Create `appsettings.json` in the project root
      - Add your Postgres, SMTP, and JWT settings:
        ```json
        {
