@@ -25,67 +25,71 @@ namespace TaskSchedulingApi.Services
                 {
                     using var scope = _serviceProvider.CreateScope();
                     var _context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    var _emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
-                    var _userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+
 
                     var tasksToProcess = await _context.ScheduledTasks.Where(t => t.NextRunAt <= DateTime.UtcNow && !t.IsDeleted && (t.Status == Models.TaskStatus.Pending || t.Status == Models.TaskStatus.Queued)).ToListAsync(stoppingToken);
 
                     _logger.LogInformation("{count} task(s) are due for processing", tasksToProcess.Count);
 
-                    foreach (var task in tasksToProcess)
+                    var parallelOptions = new ParallelOptions { MaxDegreeOfParallelism = 5, CancellationToken = stoppingToken };
+
+                    await Parallel.ForEachAsync(tasksToProcess, parallelOptions, async (task, token) =>
                     {
+                        using var _taskScope = _serviceProvider.CreateScope();
+                        var _taskContext = _taskScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var _emailService = _taskScope.ServiceProvider.GetRequiredService<IEmailService>();
+                        var _userManager = _taskScope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+                        var _loggerFactory = _taskScope.ServiceProvider.GetRequiredService<ILoggerFactory>();
+                        var _taskLogger = _loggerFactory.CreateLogger($"TaskProcessor-{task.Id}");
                         try
                         {
-                            var user = await _userManager.FindByIdAsync(task.UserId);
+                            var currentTask = await _taskContext.ScheduledTasks.FirstOrDefaultAsync(t => t.Id == task.Id, token);
+
+                            if (currentTask == null) return;
+
+                            var user = await _userManager.FindByIdAsync(currentTask.UserId);
 
                             if (user == null)
                             {
-                                _logger.LogWarning("No user found for task: {taskId}", task.Id);
-                                continue;
+                                _taskLogger.LogWarning("No user found for task: {taskId}", currentTask.Id);
+                                return;
                             }
 
-                            if (task.Type == TaskType.Recurring && task.RecurrenceInterval.HasValue)
+                            if (currentTask.Type == TaskType.Recurring && currentTask.RecurrenceInterval.HasValue)
                             {
-                                task.NextRunAt = DateTime.UtcNow.Add(task.RecurrenceInterval.Value);
-                                task.Status = Models.TaskStatus.Pending;
-                                _logger.LogInformation("Recurring task {id} scheduled for next run at {nextRunTime}", task.Id, task.NextRunAt);
+                                currentTask.NextRunAt = DateTime.UtcNow.Add(currentTask.RecurrenceInterval.Value);
+                                currentTask.Status = Models.TaskStatus.Pending;
+                                _taskLogger.LogInformation("Recurring task {id} scheduled for next run at {nextRunTime}", currentTask.Id, currentTask.NextRunAt);
                             }
                             else
                             {
-                                task.Status = Models.TaskStatus.Completed;
+                                currentTask.Status = Models.TaskStatus.Completed;
                             }
 
-                            task.LastRunAt = DateTime.UtcNow;
+                            currentTask.LastRunAt = DateTime.UtcNow;
 
-                            if (!task.NotificationSent)
+                            if (!currentTask.NotificationSent)
                             {
-                                string taskType = task.Type.ToString();
-                                string recurringInfo = task.Type == TaskType.Recurring && task.NextRunAt.HasValue ? $"<p>This is a recurring task. Next occurence: {task.NextRunAt.Value.ToString("f")}</p>" : "";
+                                string taskType = currentTask.Type.ToString();
 
-                                string emailBody = $@"
-                                            <h2>Task Reminder</h2>
-                                            <p>Your {taskType.ToLower()} task: <strong>{task.Title}</strong> is now due.</p>
-                                            <p><strong>Description:</strong> {task.Description ?? "No description provided"}</p>
-                                            <p><strong>Scheduled for:</strong> {task.ScheduledAt?.ToString("f") ?? "Immediate execution"}</p>
-                                            {recurringInfo}
-                                            <p>Please log in to your Task Scheduler account to view details.</p>
-                                            <p>Thank you for using this service!</p>";
+                                string emailBody = GenerateEmailBody(currentTask, taskType);
 
-                                await _emailService.SendEmailAsync(user.Email, $"Task Reminder: {task.Title}", emailBody);
+                                await _emailService.SendEmailAsync(user.Email, $"Task Reminder: {currentTask.Title}", emailBody);
 
-                                task.NotificationSent = true;
-                                task.NotificationSentAt = DateTime.UtcNow;
+                                currentTask.NotificationSent = true;
+                                currentTask.NotificationSentAt = DateTime.UtcNow;
 
-                                _logger.LogInformation("Notification sent for task: {id} to {email}", task.Id, user.Email);
+                                _taskLogger.LogInformation("Notification sent for task: {id} to {email}", currentTask.Id, user.Email);
                             }
 
-                            if (task.Type == TaskType.Recurring && task.Status == Models.TaskStatus.Pending)
+                            if (currentTask.Type == TaskType.Recurring && currentTask.Status == Models.TaskStatus.Pending)
                             {
-                                task.NotificationSent = false;
-                                task.NotificationSentAt = null;
+                                currentTask.NotificationSent = false;
+                                currentTask.NotificationSentAt = null;
                             }
 
-                            await _context.SaveChangesAsync(stoppingToken);
+                            _taskContext.ScheduledTasks.Update(currentTask);
+                            await _taskContext.SaveChangesAsync(token);
                         }
 
                         catch (Exception ex)
@@ -93,9 +97,14 @@ namespace TaskSchedulingApi.Services
                             _logger.LogError(ex, "Error processing task: {id}", task.Id);
 
                             if (task.RetryCount < task.MaxRetries)
-                            {
-                                await Task.Delay(5000, stoppingToken);
+                            {                                
                                 task.RetryCount++;
+
+                                int backoffSeconds = Math.Min((int)Math.Pow(2, task.RetryCount), 60);
+
+                                _taskLogger.LogWarning("Waiting {seconds} seconds before retrying task {taskId}", backoffSeconds, task.Id);
+                                await Task.Delay(TimeSpan.FromSeconds(backoffSeconds));
+
 
                                 task.Status = Models.TaskStatus.Queued;
                                 _logger.LogWarning("Task {taskId} will be retried (attempt {attempt}/{maxRetries})", task.Id, task.RetryCount, task.MaxRetries);
@@ -107,8 +116,11 @@ namespace TaskSchedulingApi.Services
                                 _logger.LogError("Task {taskId} has failed after {maxRetries} retry attempts", task.Id, task.MaxRetries);
 
                             }
+
+                            _taskContext.ScheduledTasks.Update(task);
+                            await _taskContext.SaveChangesAsync();
                         }
-                    }
+                    });
 
                 }
                 catch (Exception ex)
@@ -121,6 +133,23 @@ namespace TaskSchedulingApi.Services
 
         }
 
+        private static string GenerateEmailBody(ScheduledTask task, string taskType)
+        {
+            string recurringInfo = task.Type == TaskType.Recurring && task.NextRunAt.HasValue
+                ? $"<p>This is a recurring task. Next occurence: {task.NextRunAt.Value:f}</p>" : "";
+
+            return $@"
+        <h2>Task Reminder</h2>
+        <p>Your {taskType.ToLower()} task: <strong>{task.Title}</strong> is now due.</p>
+        <p><strong>Description:</strong> {task.Description ?? "No description provided"}</p>
+        <p><strong>Scheduled for:</strong> {task.ScheduledAt?.ToString("f") ?? "Immediate execution"}</p>
+        {recurringInfo}
+        <p>Please log in to your Task Scheduler account to view details.</p>
+        <p>Thank you for using this service!</p>";
+        }
+
 
     }
+
+
 }

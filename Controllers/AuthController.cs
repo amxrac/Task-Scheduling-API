@@ -82,7 +82,7 @@ namespace TaskSchedulingApi.Controllers
                 _logger.LogInformation("User account {Email} successfully registered at {Timestamp}", user.Email, DateTime.UtcNow);
                 return StatusCode(StatusCodes.Status201Created, new
                 {
-                    message = "Account registered successfully. Verification email sent.",
+                    message = "Account registered successfully. Check email for verification link.",
                     name = user.Name,
                     email = user.Email,
                     role = "user"
