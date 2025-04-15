@@ -1,10 +1,10 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
-using Task_Scheduling_API.Data;
-using Task_Scheduling_API.Models;
+using TaskSchedulingApi.Data;
+using TaskSchedulingApi.Models;
 
 
-namespace Task_Scheduling_API.Services
+namespace TaskSchedulingApi.Services
 {  
     public class TaskNotificationService : BackgroundService
     {
@@ -84,6 +84,8 @@ namespace Task_Scheduling_API.Services
                                 task.NotificationSent = false;
                                 task.NotificationSentAt = null;
                             }
+
+                            await _context.SaveChangesAsync(stoppingToken);
                         }
 
                         catch (Exception ex)
@@ -108,7 +110,6 @@ namespace Task_Scheduling_API.Services
                         }
                     }
 
-                    await _context.SaveChangesAsync(stoppingToken);
                 }
                 catch (Exception ex)
                 {

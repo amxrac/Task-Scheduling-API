@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.JsonWebTokens;
 using System.Security.Claims;
-using Task_Scheduling_API.Models;
+using TaskSchedulingApi.Models;
 
-namespace Task_Scheduling_API.Authorization
+namespace TaskSchedulingApi.Authorization
 {
     public class EmailConfirmedHandler : AuthorizationHandler<EmailConfirmedRequirement>
     {

@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity;
-using Task_Scheduling_API.Data;
-using Task_Scheduling_API.Models;
+using TaskSchedulingApi.Data;
+using TaskSchedulingApi.Models;
 
-namespace Task_Scheduling_API.Data.Seeders
+namespace TaskSchedulingApi.Data.Seeders
 {
     public class AdminSeeder
     {

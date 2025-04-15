@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 
-namespace Task_Scheduling_API.Authorization
+namespace TaskSchedulingApi.Authorization
 {
     public class EmailConfirmedRequirement : IAuthorizationRequirement
     {

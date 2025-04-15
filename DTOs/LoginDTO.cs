@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace Task_Scheduling_API.DTOs
+namespace TaskSchedulingApi.DTOs
 {
     public class LoginDTO
     {

@@ -1,6 +1,6 @@
-﻿using Task_Scheduling_API.Models;
+﻿using TaskSchedulingApi.Models;
 
-namespace Task_Scheduling_API.DTOs
+namespace TaskSchedulingApi.DTOs
 {
     public class CreateTaskDTO
     {

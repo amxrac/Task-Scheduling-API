@@ -1,4 +1,4 @@
-﻿namespace Task_Scheduling_API.Models
+﻿namespace TaskSchedulingApi.Models
 {
     public class ScheduledTask
     {

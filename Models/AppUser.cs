@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using System.ComponentModel.DataAnnotations;
 
-namespace Task_Scheduling_API.Models
+namespace TaskSchedulingApi.Models
 {
     public class AppUser : IdentityUser
     {

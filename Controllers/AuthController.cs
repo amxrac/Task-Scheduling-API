@@ -1,15 +1,15 @@
 ﻿using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Task_Scheduling_API.Data;
-using Task_Scheduling_API.Models;
-using Task_Scheduling_API.DTOs;
-using Task_Scheduling_API.Services;
+using TaskSchedulingApi.Data;
+using TaskSchedulingApi.Models;
+using TaskSchedulingApi.DTOs;
+using TaskSchedulingApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using System.Net.Mail;
 
-namespace Task_Scheduling_API.Controllers
+namespace TaskSchedulingApi.Controllers
 {
     [ApiController]
     [Route("api/[Controller]")]

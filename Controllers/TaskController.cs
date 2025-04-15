@@ -2,14 +2,14 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
-using Task_Scheduling_API.Data;
-using Task_Scheduling_API.DTOs;
-using Task_Scheduling_API.Services;
-using Task_Scheduling_API.Models;
+using TaskSchedulingApi.Data;
+using TaskSchedulingApi.DTOs;
+using TaskSchedulingApi.Services;
+using TaskSchedulingApi.Models;
 using Microsoft.EntityFrameworkCore;
 using Org.BouncyCastle.Pqc.Crypto.Lms;
 
-namespace Task_Scheduling_API.Controllers
+namespace TaskSchedulingApi.Controllers
 {
     [Authorize(Policy = "EmailConfirmed")]
     [ApiController]

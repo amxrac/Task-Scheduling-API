@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Task_Scheduling_API.Models;
+using TaskSchedulingApi.Models;
 
-namespace Task_Scheduling_API.Data
+namespace TaskSchedulingApi.Data
 {
     public class AppDbContext : IdentityDbContext<AppUser>
     {

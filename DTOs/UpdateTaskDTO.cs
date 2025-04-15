@@ -1,4 +1,4 @@
-﻿namespace Task_Scheduling_API.DTOs
+﻿namespace TaskSchedulingApi.DTOs
 {
     public class UpdateTaskDTO
     {

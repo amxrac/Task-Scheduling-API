@@ -5,15 +5,15 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using Task_Scheduling_API.Data;
+using TaskSchedulingApi.Data;
 
 #nullable disable
 
-namespace Task_Scheduling_API.Migrations
+namespace TaskSchedulingApi.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250406084443_AddModifiedAtFieldToScheduledTaskModel")]
-    partial class AddModifiedAtFieldToScheduledTaskModel
+    [Migration("20250414065730_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -157,7 +157,7 @@ namespace Task_Scheduling_API.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("Task_Scheduling_API.Models.AppUser", b =>
+            modelBuilder.Entity("TaskSchedulingApi.Models.AppUser", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
@@ -226,13 +226,16 @@ namespace Task_Scheduling_API.Migrations
                     b.ToTable("AspNetUsers", (string)null);
                 });
 
-            modelBuilder.Entity("Task_Scheduling_API.Models.ScheduledTask", b =>
+            modelBuilder.Entity("TaskSchedulingApi.Models.ScheduledTask", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
@@ -251,6 +254,15 @@ namespace Task_Scheduling_API.Migrations
 
                     b.Property<DateTime?>("NextRunAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("NotificationSent")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("NotificationSentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<TimeSpan?>("RecurrenceInterval")
+                        .HasColumnType("interval");
 
                     b.Property<int>("RetryCount")
                         .HasColumnType("integer");
@@ -288,7 +300,7 @@ namespace Task_Scheduling_API.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserClaim<string>", b =>
                 {
-                    b.HasOne("Task_Scheduling_API.Models.AppUser", null)
+                    b.HasOne("TaskSchedulingApi.Models.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -297,7 +309,7 @@ namespace Task_Scheduling_API.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserLogin<string>", b =>
                 {
-                    b.HasOne("Task_Scheduling_API.Models.AppUser", null)
+                    b.HasOne("TaskSchedulingApi.Models.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -312,7 +324,7 @@ namespace Task_Scheduling_API.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Task_Scheduling_API.Models.AppUser", null)
+                    b.HasOne("TaskSchedulingApi.Models.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -321,7 +333,7 @@ namespace Task_Scheduling_API.Migrations
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityUserToken<string>", b =>
                 {
-                    b.HasOne("Task_Scheduling_API.Models.AppUser", null)
+                    b.HasOne("TaskSchedulingApi.Models.AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)

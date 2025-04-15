@@ -3,7 +3,7 @@ using MailKit.Net.Smtp;
 using MailKit.Security;
 using MimeKit;
 
-namespace Task_Scheduling_API.Services
+namespace TaskSchedulingApi.Services
 {
     public interface IEmailService
     {

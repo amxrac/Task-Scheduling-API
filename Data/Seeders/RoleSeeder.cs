@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Identity;
 
-namespace Task_Scheduling_API.Data.Seeders
+namespace TaskSchedulingApi.Data.Seeders
 {
     public class RoleSeeder
     {

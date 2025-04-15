@@ -10,20 +10,18 @@ using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Task_Scheduling_API.Authorization;
-using Task_Scheduling_API.Data;
-using Task_Scheduling_API.Data.Seeders;
-using Task_Scheduling_API.Models;
-using Task_Scheduling_API.Services;
+using TaskSchedulingApi.Authorization;
+using TaskSchedulingApi.Data;
+using TaskSchedulingApi.Data.Seeders;
+using TaskSchedulingApi.Models;
+using TaskSchedulingApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var connectionString = builder.Configuration.GetConnectionString("TSDB");
 
-// Add services to the container.
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {

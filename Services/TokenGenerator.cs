@@ -4,9 +4,9 @@ using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Task_Scheduling_API.Models;
+using TaskSchedulingApi.Models;
 
-namespace Task_Scheduling_API.Services
+namespace TaskSchedulingApi.Services
 {
     public class TokenGenerator
     {
