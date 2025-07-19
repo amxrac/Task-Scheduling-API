@@ -3,7 +3,7 @@
 A .NET 8 backend API for scheduling, managing, and notifying users about tasks via email. Built with ASP.NET Core, Entity Framework Core (Postgres), and a background service for task execution.
 
 ## Features
-- **Task Types**: OneOff (runs once), Delayed (runs after a delay), Recurring (runs on a schedule—hourly/daily).
+- **Task Types**: OneOff (runs once), Delayed (runs after a delay), Recurring (runs on an hourly/daily schedule).
 - **CRUD Operations**: Create, read, update, delete tasks via RESTful endpoints.
 - **Authentication**: JWT-based, with email confirmation policy.
 - **Background Processing**: Schedules and executes tasks, sends email notifications on completion.
